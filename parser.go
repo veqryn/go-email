@@ -6,7 +6,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/mail"
-	"net/textproto"
 	"strings"
 )
 
@@ -21,11 +20,11 @@ func NewMessageOfType(messageMedia string, messageMediaParams map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	return NewMessageWithHeader(messageMedia, messageMediaParams, textproto.MIMEHeader(msg.Header), msg.Body)
+	return NewMessageWithHeader(messageMedia, messageMediaParams, Header(msg.Header), msg.Body)
 }
 
 // NewMessageWithHeader ...
-func NewMessageWithHeader(messageMedia string, messageMediaParams map[string]string, headers textproto.MIMEHeader, bodyReader io.Reader) (*Message, error) {
+func NewMessageWithHeader(messageMedia string, messageMediaParams map[string]string, headers Header, bodyReader io.Reader) (*Message, error) {
 
 	var err error
 	var contentMediaType string
@@ -47,6 +46,7 @@ func NewMessageWithHeader(messageMedia string, messageMediaParams map[string]str
 		boundary = contentMediaTypeParams["boundary"]
 	}
 
+	// Can only have one of the following: Parts, SubMessage, or Body
 	if len(boundary) > 0 {
 		err = readParts(contentMediaType, contentMediaTypeParams, bodyReader, boundary, parts)
 
@@ -65,7 +65,7 @@ func NewMessageWithHeader(messageMedia string, messageMediaParams map[string]str
 		MessageMediaParams: messageMediaParams,
 		ContentMedia:       contentMediaType,
 		ContentMediaParams: contentMediaTypeParams,
-		Header:             Header(headers),
+		Header:             headers,
 		Body:               body,
 		SubMessage:         subMessage,
 		Parts:              parts,
@@ -79,7 +79,7 @@ func readParts(messageMedia string, messageMediaParams map[string]string, bodyRe
 		if partErr != nil && partErr != io.EOF {
 			return partErr
 		}
-		newEmailPart, msgErr := NewMessageWithHeader(messageMedia, messageMediaParams, part.Header, part)
+		newEmailPart, msgErr := NewMessageWithHeader(messageMedia, messageMediaParams, Header(part.Header), part)
 		part.Close()
 		if msgErr != nil {
 			return msgErr

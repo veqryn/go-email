@@ -1,3 +1,6 @@
+/*
+Package email ...
+*/
 package email
 
 import (
@@ -8,17 +11,33 @@ import (
 
 // Message ...
 type Message struct {
-	MessageMedia       string
+	// MessageMedia represent the media type of this Message struct,
+	// including the Headers and Body/SubMessage/Parts Content.
+	MessageMedia string
+	// MessageMediaParams is a map of any parameters for the MessageMedia Content-Type
+	// such as boundary="1234abcd" and charset=ISO-8859-1
 	MessageMediaParams map[string]string
 
-	ContentMedia       string
+	// ContentMedia represent the media type of this Message's Content (the Body/SubMessage/Parts).
+	ContentMedia string
+	// ContentMediaParams is a map of any parameters for the ContentMedia Content-Type
+	// such as boundary="1234abcd" and charset=ISO-8859-1
 	ContentMediaParams map[string]string
 
+	// Header is this message's key-value MIME-style pairs in its header.
 	Header Header
 
-	Body       []byte
+	// Can only have one of the following:
+
+	// Parts is a map of the Content-Type string to the *Message of that type,
+	// and this map is full in the case where this Message has a Content-Type of "multipart".
+	Parts map[string]*Message
+	// SubMessage is an encapsulated message, and is full in the case
+	// where this Message has a Content-Type of "message".
 	SubMessage *Message
-	Parts      map[string]*Message
+	// Body is a byte array of the body of this message, and is full
+	// whenever this message doesn't have a Content-Type of "multipart" or "message".
+	Body []byte
 }
 
 // HasParts ...
@@ -36,7 +55,8 @@ func (m *Message) HasBody() bool {
 	return len(m.Body) > 0
 }
 
-// Content ...
+// Content will return the content of the message, which can only be one the
+// following: Body ([]byte), SubMessage (*Message), or Parts (map[string]*Message)
 func (m *Message) Content() interface{} {
 	if m.HasParts() {
 		return m.Parts
@@ -109,7 +129,8 @@ func (m *Message) FindBodyOfType(mediaType string) (map[string][]byte, error) {
 	return interfaceMapToBytesMap(content)
 }
 
-// FindContentOfType ...
+// FindContentOfType can be used to search for all of a major content type, such as:
+// text, message, image, audio, video, application.
 func (m *Message) FindContentOfType(mediaType string) (map[string]interface{}, error) {
 	if m.HasParts() {
 		contents := make(map[string]interface{})
