@@ -8,20 +8,32 @@ import (
 	"net/textproto"
 )
 
-// IsDeliveryStatusMessage ...
-func (m *Message) IsDeliveryStatusMessage() bool {
-	return m.MessageMedia == "message/delivery-status"
+// HasDeliveryStatusMessage ...
+func (m *Message) HasDeliveryStatusMessage() bool {
+	contentType, _, err := m.Header.ContentType()
+	if err != nil {
+		return false
+	}
+	return contentType == "message/delivery-status" && m.SubMessage != nil
+}
+
+// DeliveryStatusMessageDNS ...
+func (m *Message) DeliveryStatusMessageDNS() (Header, error) {
+	if !m.HasDeliveryStatusMessage() {
+		return Header{}, errors.New("Message does not have media content of type message/delivery-status")
+	}
+	return m.SubMessage.Header, nil
 }
 
 // DeliveryStatusRecipientDNS ...
 func (m *Message) DeliveryStatusRecipientDNS() ([]Header, error) {
 	recipientDNS := make([]Header, 0, 1)
-	if !m.IsDeliveryStatusMessage() {
-		return recipientDNS, errors.New("Message not of media content type message/delivery-status, is type: " + m.MessageMedia)
+	if !m.HasDeliveryStatusMessage() {
+		return recipientDNS, errors.New("Message does not have media content of type message/delivery-status")
 	}
 	var err error
 	var recipientHeaders textproto.MIMEHeader
-	tp := textproto.NewReader(bufio.NewReader(bytes.NewReader(m.Body)))
+	tp := textproto.NewReader(bufio.NewReader(bytes.NewReader(m.SubMessage.Body)))
 	for err != io.EOF {
 		recipientHeaders, err = tp.ReadMIMEHeader()
 		if err != nil && err != io.EOF {

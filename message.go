@@ -11,19 +11,6 @@ import (
 
 // Message ...
 type Message struct {
-	// MessageMedia represent the media type of this Message struct,
-	// including the Headers and Body/SubMessage/Parts Content.
-	MessageMedia string
-	// MessageMediaParams is a map of any parameters for the MessageMedia Content-Type
-	// such as boundary="1234abcd" and charset=ISO-8859-1
-	MessageMediaParams map[string]string
-
-	// ContentMedia represent the media type of this Message's Content (the Body/SubMessage/Parts).
-	ContentMedia string
-	// ContentMediaParams is a map of any parameters for the ContentMedia Content-Type
-	// such as boundary="1234abcd" and charset=ISO-8859-1
-	ContentMediaParams map[string]string
-
 	// Header is this message's key-value MIME-style pairs in its header.
 	Header Header
 
@@ -67,6 +54,8 @@ func (m *Message) Content() interface{} {
 	return m.Body // Could still be empty
 }
 
+// Convenience Methods:
+
 // TextPlain ...
 func (m *Message) TextPlain() (string, error) {
 	content, err := m.ContentOfType("text/plain")
@@ -109,15 +98,15 @@ func (m *Message) ContentOfType(mediaType string) (interface{}, error) {
 		if val, ok := m.Parts[mediaType]; ok {
 			return val.Content(), nil
 		}
-		return nil, errors.New("Missing Media Type: " + mediaType)
+		return nil, errors.New("Missing Part of Media Type: " + mediaType)
 	}
 	if m.HasSubMessage() {
 		return m.SubMessage.ContentOfType(mediaType)
 	}
-	if m.ContentMedia == mediaType {
+	if thisContentType, _, err := m.Header.ContentType(); err == nil && thisContentType == mediaType {
 		return m.Body, nil
 	}
-	return nil, errors.New("Missing Media Type: " + mediaType)
+	return nil, errors.New("Missing Part of Media Type: " + mediaType)
 }
 
 // FindBodyOfType ...
@@ -147,8 +136,8 @@ func (m *Message) FindContentOfType(mediaType string) (map[string]interface{}, e
 	if m.HasSubMessage() {
 		return m.SubMessage.FindContentOfType(mediaType)
 	}
-	if strings.Contains(m.ContentMedia, mediaType) {
-		return map[string]interface{}{m.ContentMedia: m.Body}, nil
+	if thisContentType, _, err := m.Header.ContentType(); err == nil && strings.Contains(thisContentType, mediaType) {
+		return map[string]interface{}{thisContentType: m.Body}, nil
 	}
 	return nil, errors.New("Missing Media Type: " + mediaType)
 }

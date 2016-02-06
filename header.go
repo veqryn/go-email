@@ -1,6 +1,8 @@
 package email
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"mime"
 	"net/mail"
@@ -92,6 +94,7 @@ func (h Header) WriteTo(w io.Writer) (n int64, err error) {
 	for field, values := range h {
 		for _, val := range values {
 			val = textproto.TrimString(val)
+			writer.curLineLen = 0 // Reset for next header
 			for _, s := range []string{field, ": ", mime.QEncoding.Encode("UTF-8", val), "\r\n"} {
 				written, err := io.WriteString(writer, s)
 				if err != nil {
@@ -99,14 +102,34 @@ func (h Header) WriteTo(w io.Writer) (n int64, err error) {
 				}
 				total += int64(written)
 			}
-			// Reset for next header
-			writer.curLineLen = 0
 		}
 	}
 	return total, nil
 }
 
+// Bytes ...
+func (h Header) Bytes() ([]byte, error) {
+	b := bytes.Buffer{}
+	_, err := h.WriteTo(&b)
+	if err != nil {
+		return []byte{}, err
+	}
+	return b.Bytes(), nil
+}
+
 // Convenience Methods:
+
+// ContentType ...
+func (h Header) ContentType() (string, map[string]string, error) {
+	if contentType := h.Get("Content-Type"); len(contentType) > 0 {
+		contentType, contentTypeParams, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return "", map[string]string{}, err
+		}
+		return contentType, contentTypeParams, nil
+	}
+	return "", map[string]string{}, errors.New("Message missing header field: Content-Type")
+}
 
 // From ...
 func (h Header) From() string {

@@ -1,6 +1,12 @@
 package email
 
-// IsFeedbackReportMessage ...
-func (m *Message) IsFeedbackReportMessage() bool {
-	return m.MessageMedia == "message/feedback-report"
+// HasFeedbackReportMessage ...
+func (m *Message) HasFeedbackReportMessage() bool {
+	contentType, _, err := m.Header.ContentType()
+	if err != nil {
+		return false
+	}
+	return contentType == "message/feedback-report" && m.SubMessage != nil
 }
+
+// TODO: wip

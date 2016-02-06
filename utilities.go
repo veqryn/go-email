@@ -67,16 +67,16 @@ func (w *headerWriter) Write(p []byte) (n int, err error) {
 	var total int
 	for len(p)+w.curLineLen > w.maxLineLen {
 		toWrite := w.maxLineLen - w.curLineLen
+		// Wrap at last space, if any
 		lastSpace := bytes.LastIndexByte(p[:toWrite], byte(' '))
 		if lastSpace > 0 {
 			toWrite = lastSpace
 		}
 		w.w.Write(p[:toWrite])
-		w.w.Write([]byte("\r\n"))
+		w.w.Write([]byte("\r\n "))
 		p = p[toWrite:]
-		w.w.Write([]byte(" "))
 		total += toWrite
-		w.curLineLen = 1
+		w.curLineLen = 1 // Continuation lines are indented
 	}
 	w.w.Write(p)
 	w.curLineLen += len(p)
