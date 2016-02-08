@@ -46,15 +46,23 @@ func (w *headerWriter) Write(p []byte) (int, error) {
 		if lastSpace > 0 {
 			toWrite = lastSpace
 		}
-		w.w.Write(p[:toWrite])
-		w.w.Write([]byte("\r\n "))
+		written, err := w.w.Write(p[:toWrite])
+		total += written
+		if err != nil {
+			return total, err
+		}
+		written, err = w.w.Write([]byte("\r\n "))
+		total += written
+		if err != nil {
+			return total, err
+		}
 		p = p[toWrite:]
-		total += toWrite
 		w.curLineLen = 1 // Continuation lines are indented
 	}
-	w.w.Write(p)
-	w.curLineLen += len(p)
-	return total + len(p), nil
+	written, err := w.w.Write(p)
+	total += written
+	w.curLineLen += written
+	return total, err
 }
 
 // base64Writer ...
@@ -69,13 +77,21 @@ func (w *base64Writer) Write(p []byte) (int, error) {
 	var total int
 	for len(p)+w.curLineLen > w.maxLineLen {
 		toWrite := w.maxLineLen - w.curLineLen
-		w.w.Write(p[:toWrite])
-		w.w.Write([]byte("\r\n"))
+		written, err := w.w.Write(p[:toWrite])
+		total += written
+		if err != nil {
+			return total, err
+		}
+		written, err = w.w.Write([]byte("\r\n"))
+		total += written
+		if err != nil {
+			return total, err
+		}
 		p = p[toWrite:]
-		total += toWrite
 		w.curLineLen = 0
 	}
-	w.w.Write(p)
-	w.curLineLen += len(p)
-	return total + len(p), nil
+	written, err := w.w.Write(p)
+	total += written
+	w.curLineLen += written
+	return total, err
 }
