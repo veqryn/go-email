@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net/mail"
 	"strings"
 )
@@ -21,25 +22,30 @@ func NewMessage(r io.Reader) (*Message, error) {
 // NewMessageWithHeader ...
 func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
+	if headers.Get("Content-Transfer-Encoding") == "quoted-printable" {
+		headers.Del("Content-Transfer-Encoding")
+		bodyReader = quotedprintable.NewReader(bodyReader)
+	}
+
 	var err error
-	var contentType string
+	var mediaType string
 	var subMessage *Message
-	contentTypeParams := make(map[string]string)
+	mediaTypeParams := make(map[string]string)
 	body := make([]byte, 0, 0)
 	parts := make([]*Message, 0, 0)
 
 	if contentType := headers.Get("Content-Type"); len(contentType) > 0 {
-		contentType, contentTypeParams, err = mime.ParseMediaType(contentType)
+		mediaType, mediaTypeParams, err = mime.ParseMediaType(contentType)
 		if err != nil {
 			return nil, err
 		}
 	} // Lack of contentType is not a problem
 
 	// Can only have one of the following: Parts, SubMessage, or Body
-	if strings.HasPrefix(contentType, "multipart") {
-		parts, err = readParts(contentType, contentTypeParams, bodyReader, contentTypeParams["boundary"])
+	if strings.HasPrefix(mediaType, "multipart") {
+		parts, err = readParts(mediaType, mediaTypeParams, bodyReader, mediaTypeParams["boundary"])
 
-	} else if strings.HasPrefix(contentType, "message") {
+	} else if strings.HasPrefix(mediaType, "message") {
 		subMessage, err = NewMessage(bodyReader)
 
 	} else {

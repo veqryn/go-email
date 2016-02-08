@@ -4,6 +4,9 @@ Package email ...
 package email
 
 import (
+	"fmt"
+	"io"
+	"mime/quotedprintable"
 	"strings"
 )
 
@@ -62,29 +65,29 @@ func (m *Message) Payload() interface{} {
 
 // HasParts ...
 func (m *Message) HasParts() bool {
-	contentType, _, err := m.Header.ContentType()
+	mediaType, _, err := m.Header.ContentType()
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(contentType, "multipart")
+	return strings.HasPrefix(mediaType, "multipart")
 }
 
 // HasSubMessage ...
 func (m *Message) HasSubMessage() bool {
-	contentType, _, err := m.Header.ContentType()
+	mediaType, _, err := m.Header.ContentType()
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(contentType, "message")
+	return strings.HasPrefix(mediaType, "message")
 }
 
 // HasBody ...
 func (m *Message) HasBody() bool {
-	contentType, _, err := m.Header.ContentType()
-	if err != nil {
+	mediaType, _, err := m.Header.ContentType()
+	if err != nil && err != ErrHeadersMissingContentType {
 		return false
 	}
-	return !strings.HasPrefix(contentType, "multipart") && !strings.HasPrefix(contentType, "message")
+	return !strings.HasPrefix(mediaType, "multipart") && !strings.HasPrefix(mediaType, "message")
 }
 
 // AllMessages ...
@@ -103,4 +106,81 @@ func (m *Message) AllMessages() []*Message {
 		}
 	}
 	return messages
+}
+
+// Methods required for sending a message:
+
+// WriteTo ...
+func (m *Message) WriteTo(w io.Writer) (int64, error) {
+
+	total, err := m.Header.WriteTo(w)
+	if err != nil {
+		return total, err
+	}
+
+	mediaType, mediaTypeParams, err := m.Header.ContentType()
+	if err != nil && err != ErrHeadersMissingContentType {
+		return total, err
+	}
+	hasParts := strings.HasPrefix(mediaType, "multipart")
+	hasSubMessage := strings.HasPrefix(mediaType, "message")
+
+	if !hasParts && !hasSubMessage {
+		return m.writeBody(w, total)
+	}
+
+	written, err := io.WriteString(w, "\r\n")
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+
+	if hasSubMessage {
+		written2, err := m.SubMessage.WriteTo(w)
+		return total + written2, err
+
+	}
+	// hasParts
+	return m.writeParts(w, mediaTypeParams["boundary"], total)
+}
+
+// writeParts ...
+func (m *Message) writeParts(w io.Writer, boundary string, total int64) (int64, error) {
+	// TODO: write out preamble and epilogue
+	for _, part := range m.Parts {
+		written, err := fmt.Fprintf(w, "\r\n--%s\r\n", boundary)
+		total += int64(written)
+		if err != nil {
+			return total, err
+		}
+		written2, err := part.WriteTo(w)
+		total += written2
+		if err != nil {
+			return total, err
+		}
+	}
+	written, err := fmt.Fprintf(w, "\r\n--%s--\r\n", boundary)
+	total += int64(written)
+	return total, err
+}
+
+// writeBody ...
+func (m *Message) writeBody(w io.Writer, total int64) (int64, error) {
+	var written int
+	var err error
+
+	// Encode as quoted-printable if we have a Content-Type, and we do not have a Content-Transfer-Encoding set
+	if len(m.Header.Get("Content-Type")) > 0 && len(m.Header.Get("Content-Transfer-Encoding")) == 0 {
+		written, err = io.WriteString(w, "Content-Transfer-Encoding: quoted-printable\r\n\r\n")
+		w = quotedprintable.NewWriter(w)
+	} else {
+		written, err = io.WriteString(w, "\r\n")
+	}
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+
+	written, err = w.Write(m.Body)
+	return total + int64(written), err
 }

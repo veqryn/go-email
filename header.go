@@ -89,8 +89,9 @@ func (h Header) Save() error {
 }
 
 // WriteTo ...
-func (h Header) WriteTo(w io.Writer) (n int64, err error) {
-	writer := &headerWriter{w: w, maxLineLen: MaxHeaderLineLength}
+func (h Header) WriteTo(w io.Writer) (int64, error) {
+	// TODO: Fix up the header writer, then switch to MaxHeaderLineLength
+	writer := &headerWriter{w: w, maxLineLen: MaxHeaderTotalLength}
 	var total int64
 	// TODO: sort fields (and sort received headers by date)
 	for field, values := range h {
@@ -120,8 +121,11 @@ func (h Header) ContentType() (string, map[string]string, error) {
 		}
 		return mediaType, mediaTypeParams, nil
 	}
-	return "", map[string]string{}, errors.New("Message missing header field: Content-Type")
+	return "", map[string]string{}, ErrHeadersMissingContentType
 }
+
+// ErrHeadersMissingContentType ...
+var ErrHeadersMissingContentType = errors.New("Message missing header field: Content-Type")
 
 // From ...
 func (h Header) From() string {

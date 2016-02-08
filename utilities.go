@@ -36,7 +36,7 @@ type headerWriter struct {
 }
 
 // Write ...
-func (w *headerWriter) Write(p []byte) (n int, err error) {
+func (w *headerWriter) Write(p []byte) (int, error) {
 	// TODO: logic for wrapping headers is actually pretty complex for some header types, like received headers
 	var total int
 	for len(p)+w.curLineLen > w.maxLineLen {
@@ -65,7 +65,7 @@ type base64Writer struct {
 }
 
 // Write ...
-func (w *base64Writer) Write(p []byte) (n int, err error) {
+func (w *base64Writer) Write(p []byte) (int, error) {
 	var total int
 	for len(p)+w.curLineLen > w.maxLineLen {
 		toWrite := w.maxLineLen - w.curLineLen
