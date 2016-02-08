@@ -1,7 +1,6 @@
 package email
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"mime"
@@ -12,8 +11,11 @@ import (
 )
 
 const (
-	MaxHeaderLengthLength = 78
-	MaxHeaderTotalLength  = 998
+	// MaxHeaderLineLength ...
+	MaxHeaderLineLength = 78
+
+	// MaxHeaderTotalLength ...
+	MaxHeaderTotalLength = 998
 )
 
 // Header represents the key-value MIME-style pairs in a mail message header.
@@ -88,7 +90,7 @@ func (h Header) Save() error {
 
 // WriteTo ...
 func (h Header) WriteTo(w io.Writer) (n int64, err error) {
-	writer := &headerWriter{w: w, maxLineLen: MaxHeaderLengthLength}
+	writer := &headerWriter{w: w, maxLineLen: MaxHeaderLineLength}
 	var total int64
 	// TODO: sort fields (and sort received headers by date)
 	for field, values := range h {
@@ -107,26 +109,16 @@ func (h Header) WriteTo(w io.Writer) (n int64, err error) {
 	return total, nil
 }
 
-// Bytes ...
-func (h Header) Bytes() ([]byte, error) {
-	b := bytes.Buffer{}
-	_, err := h.WriteTo(&b)
-	if err != nil {
-		return []byte{}, err
-	}
-	return b.Bytes(), nil
-}
-
 // Convenience Methods:
 
 // ContentType ...
 func (h Header) ContentType() (string, map[string]string, error) {
 	if contentType := h.Get("Content-Type"); len(contentType) > 0 {
-		contentType, contentTypeParams, err := mime.ParseMediaType(contentType)
+		mediaType, mediaTypeParams, err := mime.ParseMediaType(contentType)
 		if err != nil {
 			return "", map[string]string{}, err
 		}
-		return contentType, contentTypeParams, nil
+		return mediaType, mediaTypeParams, nil
 	}
 	return "", map[string]string{}, errors.New("Message missing header field: Content-Type")
 }

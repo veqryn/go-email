@@ -23,27 +23,21 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 
 	var err error
 	var contentType string
-	var boundary string
 	var subMessage *Message
 	contentTypeParams := make(map[string]string)
 	body := make([]byte, 0, 0)
-	parts := make(map[string]*Message)
+	parts := make([]*Message, 0, 0)
 
 	if contentType := headers.Get("Content-Type"); len(contentType) > 0 {
 		contentType, contentTypeParams, err = mime.ParseMediaType(contentType)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	contentType = strings.ToLower(contentType)
-	if strings.HasPrefix(contentType, "multipart") {
-		boundary = contentTypeParams["boundary"]
-	}
+	} // Lack of contentType is not a problem
 
 	// Can only have one of the following: Parts, SubMessage, or Body
-	if len(boundary) > 0 {
-		err = readParts(contentType, contentTypeParams, bodyReader, boundary, parts)
+	if strings.HasPrefix(contentType, "multipart") {
+		parts, err = readParts(contentType, contentTypeParams, bodyReader, contentTypeParams["boundary"])
 
 	} else if strings.HasPrefix(contentType, "message") {
 		subMessage, err = NewMessage(bodyReader)
@@ -64,22 +58,20 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 }
 
 // readParts ...
-func readParts(messageMedia string, messageMediaParams map[string]string, bodyReader io.Reader, boundary string, parts map[string]*Message) error {
+func readParts(messageMedia string, messageMediaParams map[string]string, bodyReader io.Reader, boundary string) ([]*Message, error) {
+	// TODO: parse out and save the preamble and epilogue
+	parts := make([]*Message, 0, 1)
 	multipartReader := multipart.NewReader(bodyReader, boundary)
 	for part, partErr := multipartReader.NextPart(); partErr != io.EOF; part, partErr = multipartReader.NextPart() {
 		if partErr != nil && partErr != io.EOF {
-			return partErr
+			return []*Message{}, partErr
 		}
 		newEmailPart, msgErr := NewMessageWithHeader(Header(part.Header), part)
 		part.Close()
 		if msgErr != nil {
-			return msgErr
+			return []*Message{}, msgErr
 		}
-		newPartContentType, _, contentErr := newEmailPart.Header.ContentType()
-		if contentErr != nil {
-			return contentErr
-		}
-		parts[newPartContentType] = newEmailPart
+		parts = append(parts, newEmailPart)
 	}
-	return nil
+	return parts, nil
 }
