@@ -5,6 +5,7 @@
 package email
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"fmt"
@@ -98,4 +99,44 @@ func (w *base64Writer) Write(p []byte) (int, error) {
 	total += written
 	w.curLineLen += written
 	return total, err
+}
+
+// leftTrimReader ...
+type leftTrimReader struct {
+	r    *bufio.Reader
+	done bool
+}
+
+// Read ...
+func (r *leftTrimReader) Read(p []byte) (n3 int, err3 error) {
+	if r.done {
+		// Delegate
+		return r.r.Read(p)
+	}
+	// Peek and discard any whitespace, until we hit the first non-whitespace byte, then delegate
+	r.r.Peek(1) // force a buffer load if empty
+	maxBuffered := r.r.Buffered()
+	if maxBuffered == 0 {
+		r.done = true
+		return r.r.Read(p)
+	}
+	peek, _ := r.r.Peek(maxBuffered)
+	maxBuffered = len(peek)
+	whiteSpaceCount := 0
+	for whiteSpaceCount < maxBuffered && isASCIISpace(peek[whiteSpaceCount]) {
+		whiteSpaceCount++
+	}
+	if whiteSpaceCount > 0 {
+		discarded, err := r.r.Discard(whiteSpaceCount)
+		if err == nil && discarded == whiteSpaceCount && whiteSpaceCount == maxBuffered {
+			return r.Read(p)
+		}
+	}
+	r.done = true
+	return r.r.Read(p)
+}
+
+// isASCIISpace ...
+func isASCIISpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }

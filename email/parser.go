@@ -5,6 +5,7 @@
 package email
 
 import (
+	"bufio"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -16,7 +17,7 @@ import (
 
 // NewMessage ...
 func NewMessage(r io.Reader) (*Message, error) {
-	msg, err := mail.ReadMessage(r)
+	msg, err := mail.ReadMessage(&leftTrimReader{r: bufio.NewReader(r)})
 	if err != nil {
 		return nil, err
 	}
