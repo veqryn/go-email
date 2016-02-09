@@ -94,19 +94,39 @@ func (m *Message) HasBody() bool {
 	return !strings.HasPrefix(mediaType, "multipart") && !strings.HasPrefix(mediaType, "message")
 }
 
-// AllMessages ...
-func (m *Message) AllMessages() []*Message {
+// MessagesAll ...
+func (m *Message) MessagesAll() []*Message {
+	return m.MessagesFilter(func(tested *Message) bool {
+		return true
+	})
+}
+
+// MessagesContentTypePrefix ...
+func (m *Message) MessagesContentTypePrefix(contentTypePrefix string) []*Message {
+	return m.MessagesFilter(func(tested *Message) bool {
+		mediaType, _, err := tested.Header.ContentType()
+		if err != nil {
+			return false
+		}
+		return strings.HasPrefix(mediaType, contentTypePrefix)
+	})
+}
+
+// MessagesFilter ...
+func (m *Message) MessagesFilter(filter func(*Message) bool) []*Message {
 
 	messages := make([]*Message, 0, 1)
-	messages = append(messages, m)
+	if filter(m) {
+		messages = append(messages, m)
+	}
 
 	if m.HasSubMessage() {
-		return append(messages, m.SubMessage.AllMessages()...)
+		return append(messages, m.SubMessage.MessagesFilter(filter)...)
 	}
 
 	if m.HasParts() {
 		for _, part := range m.Parts {
-			messages = append(messages, part.AllMessages()...)
+			messages = append(messages, part.MessagesFilter(filter)...)
 		}
 	}
 	return messages
