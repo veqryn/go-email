@@ -33,6 +33,14 @@ func genMessageID() (string, error) {
 	return fmt.Sprintf("<%d.%d.%d@%s>", nanoTime, pid, random, hostname), nil
 }
 
+// bufioReader ...
+func bufioReader(r io.Reader) *bufio.Reader {
+	if bufferedReader, ok := r.(*bufio.Reader); ok {
+		return bufferedReader
+	}
+	return bufio.NewReader(r)
+}
+
 // headerWriter ...
 type headerWriter struct {
 	w          io.Writer

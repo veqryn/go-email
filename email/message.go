@@ -24,6 +24,14 @@ type Message struct {
 	// Header is this message's key-value MIME-style pairs in its header.
 	Header Header
 
+	// Preamble is any text that appears before the first mime multipart,
+	// and may only be full in the case where this Message has a Content-Type of "multipart".
+	Preamble []byte
+
+	// Epilogue is any text that appears after the last mime multipart,
+	// and may only be full in the case where this Message has a Content-Type of "multipart".
+	Epilogue []byte
+
 	// Can only have one of the following:
 
 	// Parts is a slice of Messages contained within this Message,
@@ -170,20 +178,33 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 
 // writeParts ...
 func (m *Message) writeParts(w io.Writer, boundary string, total int64) (int64, error) {
-	// TODO: write out preamble and epilogue
+
+	written, err := w.Write(m.Preamble)
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+
 	for _, part := range m.Parts {
-		written, err := fmt.Fprintf(w, "\r\n--%s\r\n", boundary)
+		written, err = fmt.Fprintf(w, "\r\n--%s\r\n", boundary)
 		total += int64(written)
 		if err != nil {
 			return total, err
 		}
-		written2, err := part.WriteTo(w)
+		written2, err2 := part.WriteTo(w)
 		total += written2
-		if err != nil {
-			return total, err
+		if err2 != nil {
+			return total, err2
 		}
 	}
-	written, err := fmt.Fprintf(w, "\r\n--%s--\r\n", boundary)
+
+	written, err = fmt.Fprintf(w, "\r\n--%s--\r\n", boundary)
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+
+	written, err = w.Write(m.Epilogue)
 	total += int64(written)
 	return total, err
 }

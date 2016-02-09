@@ -6,6 +6,8 @@ package email
 
 import (
 	"bufio"
+	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -17,7 +19,7 @@ import (
 
 // NewMessage ...
 func NewMessage(r io.Reader) (*Message, error) {
-	msg, err := mail.ReadMessage(&leftTrimReader{r: bufio.NewReader(r)})
+	msg, err := mail.ReadMessage(&leftTrimReader{r: bufioReader(r)})
 	if err != nil {
 		return nil, err
 	}
@@ -36,6 +38,8 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 	var mediaType string
 	var subMessage *Message
 	mediaTypeParams := make(map[string]string)
+	preamble := make([]byte, 0, 0)
+	epilogue := make([]byte, 0, 0)
 	body := make([]byte, 0, 0)
 	parts := make([]*Message, 0, 0)
 
@@ -48,7 +52,14 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 
 	// Can only have one of the following: Parts, SubMessage, or Body
 	if strings.HasPrefix(mediaType, "multipart") {
-		parts, err = readParts(mediaType, mediaTypeParams, bodyReader, mediaTypeParams["boundary"])
+		boundary := mediaTypeParams["boundary"]
+		preamble, err = readPreamble(bodyReader, boundary)
+		if err == nil {
+			parts, err = readParts(mediaType, mediaTypeParams, bodyReader, boundary)
+			if err == nil {
+				epilogue, err = ioutil.ReadAll(bodyReader)
+			}
+		}
 
 	} else if strings.HasPrefix(mediaType, "message") {
 		subMessage, err = NewMessage(bodyReader)
@@ -62,6 +73,8 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 
 	return &Message{
 		Header:     headers,
+		Preamble:   preamble,
+		Epilogue:   epilogue,
 		Body:       body,
 		SubMessage: subMessage,
 		Parts:      parts,
@@ -70,9 +83,10 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 
 // readParts ...
 func readParts(messageMedia string, messageMediaParams map[string]string, bodyReader io.Reader, boundary string) ([]*Message, error) {
-	// TODO: parse out and save the preamble and epilogue
+
 	parts := make([]*Message, 0, 1)
 	multipartReader := multipart.NewReader(bodyReader, boundary)
+
 	for part, partErr := multipartReader.NextPart(); partErr != io.EOF; part, partErr = multipartReader.NextPart() {
 		if partErr != nil && partErr != io.EOF {
 			return []*Message{}, partErr
@@ -85,4 +99,43 @@ func readParts(messageMedia string, messageMediaParams map[string]string, bodyRe
 		parts = append(parts, newEmailPart)
 	}
 	return parts, nil
+}
+
+// readPreamble ...
+func readPreamble(r io.Reader, boundary string) ([]byte, error) {
+	return ioutil.ReadAll(&preambleReader{r: bufioReader(r), boundary: []byte("--" + boundary)})
+}
+
+// preambleReader ...
+type preambleReader struct {
+	r        *bufio.Reader
+	boundary []byte
+}
+
+// Read ...
+func (r *preambleReader) Read(p []byte) (int, error) {
+	// Peek and read up to the --boundary, then EOF
+	peek, err := r.r.Peek(4096)
+	if err != nil && err != io.EOF {
+		return 0, fmt.Errorf("Preamble Read: %v", err)
+	}
+
+	idx := bytes.Index(peek, r.boundary)
+
+	if idx < 0 {
+		return r.r.Read(p)
+	}
+
+	// Account for possible new line at start of the boundary, which we shouldn't remove
+	if idx <= 2 {
+		return 0, io.EOF
+	}
+
+	preamble := make([]byte, idx-2)
+	n, err := r.r.Read(preamble)
+	copy(p, preamble)
+	if err != nil && err != io.EOF {
+		return n, err
+	}
+	return n, io.EOF
 }
