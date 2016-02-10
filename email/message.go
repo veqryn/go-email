@@ -179,14 +179,16 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 // writeParts ...
 func (m *Message) writeParts(w io.Writer, boundary string, total int64) (int64, error) {
 
-	written, err := w.Write(m.Preamble)
-	total += int64(written)
-	if err != nil {
-		return total, err
+	if len(m.Preamble) > 0 {
+		written, err := fmt.Fprintf(w, "%s\r\n", m.Preamble)
+		total += int64(written)
+		if err != nil {
+			return total, err
+		}
 	}
 
 	for _, part := range m.Parts {
-		written, err = fmt.Fprintf(w, "\r\n--%s\r\n", boundary)
+		written, err := fmt.Fprintf(w, "\r\n--%s\r\n", boundary)
 		total += int64(written)
 		if err != nil {
 			return total, err
@@ -198,14 +200,19 @@ func (m *Message) writeParts(w io.Writer, boundary string, total int64) (int64, 
 		}
 	}
 
-	written, err = fmt.Fprintf(w, "\r\n--%s--\r\n", boundary)
+	written, err := fmt.Fprintf(w, "\r\n--%s--\r\n", boundary)
 	total += int64(written)
 	if err != nil {
 		return total, err
 	}
 
-	written, err = w.Write(m.Epilogue)
-	total += int64(written)
+	if len(m.Epilogue) > 0 {
+		written, err = fmt.Fprintf(w, "%s\r\n", m.Epilogue)
+		total += int64(written)
+		if err != nil {
+			return total, err
+		}
+	}
 	return total, err
 }
 
@@ -217,15 +224,21 @@ func (m *Message) writeBody(w io.Writer, total int64) (int64, error) {
 	// Encode as quoted-printable if we have a Content-Type, and we do not have a Content-Transfer-Encoding set
 	if len(m.Header.Get("Content-Type")) > 0 && len(m.Header.Get("Content-Transfer-Encoding")) == 0 {
 		written, err = io.WriteString(w, "Content-Transfer-Encoding: quoted-printable\r\n\r\n")
-		w = quotedprintable.NewWriter(w)
-	} else {
-		written, err = io.WriteString(w, "\r\n")
+		qpWriter := quotedprintable.NewWriter(w)
+		total += int64(written)
+		if err != nil {
+			return total, err
+		}
+		written, err = qpWriter.Write(m.Body)
+		qpWriter.Close() // Must remember to close the wrapper, as it needs to flush to underlying writer
+		return total + int64(written), err
+
 	}
+	written, err = io.WriteString(w, "\r\n")
 	total += int64(written)
 	if err != nil {
 		return total, err
 	}
-
 	written, err = w.Write(m.Body)
 	return total + int64(written), err
 }

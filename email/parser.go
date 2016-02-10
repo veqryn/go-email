@@ -53,11 +53,12 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 	// Can only have one of the following: Parts, SubMessage, or Body
 	if strings.HasPrefix(mediaType, "multipart") {
 		boundary := mediaTypeParams["boundary"]
-		preamble, err = readPreamble(bodyReader, boundary)
+		bufferedReader := bufioReader(bodyReader)
+		preamble, err = readPreamble(bufferedReader, boundary)
 		if err == nil {
-			parts, err = readParts(mediaType, mediaTypeParams, bodyReader, boundary)
+			parts, err = readParts(mediaType, mediaTypeParams, bufferedReader, boundary)
 			if err == nil {
-				epilogue, err = ioutil.ReadAll(bodyReader)
+				epilogue, err = readEpilogue(bufferedReader)
 			}
 		}
 
@@ -101,9 +102,18 @@ func readParts(messageMedia string, messageMediaParams map[string]string, bodyRe
 	return parts, nil
 }
 
+// readEpilogue ...
+func readEpilogue(r io.Reader) ([]byte, error) {
+	epilogue, err := ioutil.ReadAll(r)
+	for len(epilogue) > 0 && isASCIISpace(epilogue[len(epilogue)-1]) {
+		epilogue = epilogue[:len(epilogue)-1]
+	}
+	return epilogue, err
+}
+
 // readPreamble ...
-func readPreamble(r io.Reader, boundary string) ([]byte, error) {
-	return ioutil.ReadAll(&preambleReader{r: bufioReader(r), boundary: []byte("--" + boundary)})
+func readPreamble(r *bufio.Reader, boundary string) ([]byte, error) {
+	return ioutil.ReadAll(&preambleReader{r: r, boundary: []byte("--" + boundary)})
 }
 
 // preambleReader ...
@@ -114,8 +124,11 @@ type preambleReader struct {
 
 // Read ...
 func (r *preambleReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	// Peek and read up to the --boundary, then EOF
-	peek, err := r.r.Peek(4096)
+	peek, err := r.r.Peek(len(p))
 	if err != nil && err != io.EOF {
 		return 0, fmt.Errorf("Preamble Read: %v", err)
 	}
@@ -123,17 +136,23 @@ func (r *preambleReader) Read(p []byte) (int, error) {
 	idx := bytes.Index(peek, r.boundary)
 
 	if idx < 0 {
-		return r.r.Read(p)
+		// Couldn't find the boundary, so read all the bytes we can,
+		// but leave room for a new-line + boundary that got cut in half by the buffer,
+		// that way it can be matched against on the next read
+		return r.r.Read(p[:max(1, len(peek)-(len(r.boundary)+2))])
 	}
 
-	// Account for possible new line at start of the boundary, which we shouldn't remove
-	if idx <= 2 {
+	// Account for possible new-line / whitespace at start of the boundary, which shouldn't be removed
+	for idx > 0 && isASCIISpace(peek[idx-1]) {
+		idx--
+	}
+
+	if idx == 0 {
+		// The boundary (or new-line + boundary) is at the start of the reader, so there is no preamble
 		return 0, io.EOF
 	}
 
-	preamble := make([]byte, idx-2)
-	n, err := r.r.Read(preamble)
-	copy(p, preamble)
+	n, err := r.r.Read(p[:idx])
 	if err != nil && err != io.EOF {
 		return n, err
 	}

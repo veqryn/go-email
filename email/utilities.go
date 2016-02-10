@@ -33,6 +33,20 @@ func genMessageID() (string, error) {
 	return fmt.Sprintf("<%d.%d.%d@%s>", nanoTime, pid, random, hostname), nil
 }
 
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 // bufioReader ...
 func bufioReader(r io.Reader) *bufio.Reader {
 	if bufferedReader, ok := r.(*bufio.Reader); ok {
