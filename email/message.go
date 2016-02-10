@@ -8,6 +8,7 @@ Package email ...
 package email
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime/quotedprintable"
@@ -46,22 +47,6 @@ type Message struct {
 	// whenever this message doesn't have a Content-Type of "multipart" or "message".
 	Body []byte
 }
-
-/*
-Proper construction of a nested multipart message is as follows:
-* multipart/mixed
-* * multipart/alternative
-* * * text/plain
-* * * multipart/related
-* * * * text/html
-* * * * image/jpeg (inline with Content-ID)
-* * * * image/jpeg (inline with Content-ID)
-* * application/pdf (attachment)
-* * application/pdf (attachment)
-* * (etc with other attachments...)
-With the last listed in any multipart section being the 'preferred' one to show in any client.
-Note that having multiple parts with the same Content-Type is legal!
-*/
 
 // Payload will return the payload of the message, which can only be one the
 // following: Body ([]byte), SubMessage (*Message), or Parts ([]*Message)
@@ -141,6 +126,26 @@ func (m *Message) MessagesFilter(filter func(*Message) bool) []*Message {
 }
 
 // Methods required for sending a message:
+/*
+Proper construction of a nested multipart message is as follows:
+* multipart/mixed
+* * multipart/alternative
+* * * text/plain
+* * * multipart/related
+* * * * text/html
+* * * * image/jpeg (inline with Content-ID)
+* * * * image/jpeg (inline with Content-ID)
+* * application/pdf (attachment)
+* * application/pdf (attachment)
+* * (etc with other attachments...)
+With the last listed in any multipart section being the 'preferred' one to show in any client.
+Note that having multiple parts with the same Content-Type is legal!
+*/
+
+// Save ...
+func (m *Message) Save() error {
+	return m.Header.Save()
+}
 
 // WriteTo ...
 func (m *Message) WriteTo(w io.Writer) (int64, error) {
@@ -221,24 +226,48 @@ func (m *Message) writeBody(w io.Writer, total int64) (int64, error) {
 	var written int
 	var err error
 
-	// Encode as quoted-printable if we have a Content-Type, and we do not have a Content-Transfer-Encoding set
-	if len(m.Header.Get("Content-Type")) > 0 && len(m.Header.Get("Content-Transfer-Encoding")) == 0 {
-		written, err = io.WriteString(w, "Content-Transfer-Encoding: quoted-printable\r\n\r\n")
-		qpWriter := quotedprintable.NewWriter(w)
-		total += int64(written)
-		if err != nil {
-			return total, err
-		}
-		written, err = qpWriter.Write(m.Body)
-		qpWriter.Close() // Must remember to close the wrapper, as it needs to flush to underlying writer
-		return total + int64(written), err
+	// Encode if we have Content-Type, and we do not have Content-Transfer-Encoding set
+	if contentType := m.Header.Get("Content-Type"); len(contentType) > 0 && !m.Header.IsSet("Content-Transfer-Encoding") {
 
+		if strings.HasPrefix(contentType, "text") {
+			return m.writeText(w, total)
+		}
+		return m.writeBase64(w, total)
 	}
+
 	written, err = io.WriteString(w, "\r\n")
 	total += int64(written)
 	if err != nil {
 		return total, err
 	}
 	written, err = w.Write(m.Body)
+	return total + int64(written), err
+}
+
+// writeText ...
+func (m *Message) writeText(w io.Writer, total int64) (int64, error) {
+	written, err := io.WriteString(w, "Content-Transfer-Encoding: quoted-printable\r\n\r\n")
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+	// quotedprintable takes care of wrapping content at a good line length already
+	qpWriter := quotedprintable.NewWriter(w)
+	written, err = qpWriter.Write(m.Body)
+	qpWriter.Close() // Must remember to close the wrapper, as it needs to flush to underlying writer
+	return total + int64(written), err
+}
+
+// writeBase64 ...
+func (m *Message) writeBase64(w io.Writer, total int64) (int64, error) {
+	written, err := io.WriteString(w, "Content-Transfer-Encoding: base64\r\n\r\n")
+	total += int64(written)
+	if err != nil {
+		return total, err
+	}
+	// must wrap content at 76 characters
+	b64Writer := base64.NewEncoder(base64.StdEncoding, &base64Writer{w: w, maxLineLen: MaxBodyLineLength})
+	written, err = b64Writer.Write(m.Body)
+	b64Writer.Close() // Must remember to close the wrapper, as it needs to flush to underlying writer
 	return total + int64(written), err
 }

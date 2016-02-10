@@ -57,6 +57,15 @@ func (h Header) Get(key string) string {
 	return v[0]
 }
 
+// IsSet tests if a key is present in the Header
+func (h Header) IsSet(key string) bool {
+	if h == nil {
+		return false
+	}
+	_, ok := h[textproto.CanonicalMIMEHeaderKey(key)]
+	return ok
+}
+
 // Del deletes the values associated with key.
 func (h Header) Del(key string) {
 	delete(h, textproto.CanonicalMIMEHeaderKey(key))

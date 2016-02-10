@@ -7,6 +7,7 @@ package email
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,10 +30,7 @@ func NewMessage(r io.Reader) (*Message, error) {
 // NewMessageWithHeader ...
 func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
-	if headers.Get("Content-Transfer-Encoding") == "quoted-printable" {
-		headers.Del("Content-Transfer-Encoding")
-		bodyReader = quotedprintable.NewReader(bodyReader)
-	}
+	bufferedReader := contentReader(headers, bodyReader)
 
 	var err error
 	var mediaType string
@@ -53,7 +51,6 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 	// Can only have one of the following: Parts, SubMessage, or Body
 	if strings.HasPrefix(mediaType, "multipart") {
 		boundary := mediaTypeParams["boundary"]
-		bufferedReader := bufioReader(bodyReader)
 		preamble, err = readPreamble(bufferedReader, boundary)
 		if err == nil {
 			parts, err = readParts(mediaType, mediaTypeParams, bufferedReader, boundary)
@@ -63,10 +60,10 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 		}
 
 	} else if strings.HasPrefix(mediaType, "message") {
-		subMessage, err = NewMessage(bodyReader)
+		subMessage, err = NewMessage(bufferedReader)
 
 	} else {
-		body, err = ioutil.ReadAll(bodyReader)
+		body, err = ioutil.ReadAll(bufferedReader)
 	}
 	if err != nil {
 		return nil, err
@@ -157,4 +154,17 @@ func (r *preambleReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 	return n, io.EOF
+}
+
+// contentReader ...
+func contentReader(headers Header, bodyReader io.Reader) *bufio.Reader {
+	if headers.Get("Content-Transfer-Encoding") == "quoted-printable" {
+		headers.Del("Content-Transfer-Encoding")
+		return bufioReader(quotedprintable.NewReader(bodyReader))
+	}
+	if headers.Get("Content-Transfer-Encoding") == "base64" {
+		headers.Del("Content-Transfer-Encoding")
+		return bufioReader(base64.NewDecoder(base64.StdEncoding, bodyReader))
+	}
+	return bufioReader(bodyReader)
 }
