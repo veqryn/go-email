@@ -85,7 +85,8 @@ func (h Header) AddressList(key string) ([]*mail.Address, error) {
 
 // Methods required for sending a message:
 
-// Save ...
+// Save adds headers for the "Message-Id", "Date", and "MIME-Version", if missing.
+// An error is returned if the Message-Id can not be created.
 func (h Header) Save() error {
 	if len(h.Get("Message-Id")) == 0 {
 		id, err := genMessageID()
@@ -125,7 +126,8 @@ func (h Header) WriteTo(w io.Writer) (int64, error) {
 
 // Convenience Methods:
 
-// ContentType ...
+// ContentType parses and returns the media type, any parameters on it,
+// and an error if there is no content type header field.
 func (h Header) ContentType() (string, map[string]string, error) {
 	if contentType := h.Get("Content-Type"); len(contentType) > 0 {
 		mediaType, mediaTypeParams, err := mime.ParseMediaType(contentType)

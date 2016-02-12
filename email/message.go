@@ -3,7 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /*
-Package email ...
+Package email implements the parsing of email and mime mail messages,
+and may also be used to create and send email messages.
 */
 package email
 
@@ -20,7 +21,15 @@ const (
 	MaxBodyLineLength = 76
 )
 
-// Message ...
+// Message represents a full email message, or a mime-message
+// (such as a single part in a multipart message).
+// It has fields for the Header and the payload, which may take
+// several forms depending on the Content-Type of this message.
+// If the Content-Type is "message", then the payload will be a SubMessage.
+// If the Content-Type is "multipart", then the payload will be Parts,
+// and optionally the Preamble and Epilogue will be full.
+// If the Content-Type is neither "message" nor "multipart", then
+// the payload will be a Body (decoded if quoted-printable or base64).
 type Message struct {
 	// Header is this message's key-value MIME-style pairs in its header.
 	Header Header
@@ -45,6 +54,9 @@ type Message struct {
 
 	// Body is a byte array of the body of this message, and is full
 	// whenever this message doesn't have a Content-Type of "multipart" or "message".
+	// The Body is already decoded if the Content-Transfer-Encoding was
+	// quoted-printable or base64, and will be re-encoded when written out
+	// based on the Content-Type.
 	Body []byte
 }
 
@@ -60,7 +72,7 @@ func (m *Message) Payload() interface{} {
 	return m.Body
 }
 
-// HasParts ...
+// HasParts returns true if the Content-Type is "multipart"
 func (m *Message) HasParts() bool {
 	mediaType, _, err := m.Header.ContentType()
 	if err != nil {
@@ -69,7 +81,7 @@ func (m *Message) HasParts() bool {
 	return strings.HasPrefix(mediaType, "multipart")
 }
 
-// HasSubMessage ...
+// HasSubMessage returns true if the Content-Type is "message"
 func (m *Message) HasSubMessage() bool {
 	mediaType, _, err := m.Header.ContentType()
 	if err != nil {
@@ -78,7 +90,7 @@ func (m *Message) HasSubMessage() bool {
 	return strings.HasPrefix(mediaType, "message")
 }
 
-// HasBody ...
+// HasBody returns true if the Content-Type is not "multipart" nor "message"
 func (m *Message) HasBody() bool {
 	mediaType, _, err := m.Header.ContentType()
 	if err != nil && err != ErrHeadersMissingContentType {
@@ -87,12 +99,19 @@ func (m *Message) HasBody() bool {
 	return !strings.HasPrefix(mediaType, "multipart") && !strings.HasPrefix(mediaType, "message")
 }
 
-// PartsContentTypePrefix ...
+// PartsContentTypePrefix will return a slice of all parts of this message
+// that have this contentTypePrefix.
+// contentTypePrefix can be a prefix ("text"), or a full type ("text/html").
+// The slice will be empty if this message is not a multipart message.
+// This method does NOT recurse into sub-messages and sub-parts.
 func (m *Message) PartsContentTypePrefix(contentTypePrefix string) []*Message {
 	return m.PartsFilter(contentTypePrefixFilterClosure(contentTypePrefix))
 }
 
-// PartsFilter ...
+// PartsFilter will return a slice of all parts of this message
+// that match this lambda function.
+// The slice will be empty if this message is not a multipart message.
+// This method does NOT recurse into sub-messages and sub-parts.
 func (m *Message) PartsFilter(filter func(*Message) bool) []*Message {
 
 	messages := make([]*Message, 0, 1)
@@ -106,19 +125,29 @@ func (m *Message) PartsFilter(filter func(*Message) bool) []*Message {
 	return messages
 }
 
-// MessagesAll ...
+// MessagesAll will return a slice of Messages, starting with this message,
+// and followed by all messages contained within this message, recursively.
+// This method is similar to Python's email message "walk" function.
+// This method DOES recurse into sub-messages and sub-parts.
 func (m *Message) MessagesAll() []*Message {
 	return m.MessagesFilter(func(tested *Message) bool {
 		return true
 	})
 }
 
-// MessagesContentTypePrefix ...
+// MessagesContentTypePrefix will return a slice of all Messages that have
+// this contentTypePrefix, potentially including this message and messages
+// contained within this message.
+// contentTypePrefix can be a prefix ("text"), or a full type ("text/html").
+// This method DOES recurse into sub-messages and sub-parts.
 func (m *Message) MessagesContentTypePrefix(contentTypePrefix string) []*Message {
 	return m.MessagesFilter(contentTypePrefixFilterClosure(contentTypePrefix))
 }
 
-// MessagesFilter ...
+// MessagesFilter will return a slice of all Messages that match this lambda
+// function, potentially including this message and messages contained within
+// this message.
+// This method DOES recurse into sub-messages and sub-parts.
 func (m *Message) MessagesFilter(filter func(*Message) bool) []*Message {
 
 	messages := make([]*Message, 0, 1)
@@ -138,7 +167,8 @@ func (m *Message) MessagesFilter(filter func(*Message) bool) []*Message {
 	return messages
 }
 
-// contentTypePrefixFilterClosure ...
+// contentTypePrefixFilterClosure returns a closure that returns true if
+// the message has this contentTypePrefix.
 func contentTypePrefixFilterClosure(contentTypePrefix string) func(*Message) bool {
 	return func(tested *Message) bool {
 		mediaType, _, err := tested.Header.ContentType()
@@ -166,7 +196,8 @@ With the last listed in any multipart section being the 'preferred' one to show 
 Note that having multiple parts with the same Content-Type is legal!
 */
 
-// Save ...
+// Save adds headers for the "Message-Id", "Date", and "MIME-Version", if missing.
+// An error is returned if the Message-Id can not be created.
 func (m *Message) Save() error {
 	return m.Header.Save()
 }

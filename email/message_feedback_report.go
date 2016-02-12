@@ -4,7 +4,8 @@
 
 package email
 
-// HasFeedbackReportMessage ...
+// HasFeedbackReportMessage returns true if this Message has a
+// content type of "message/feedback-report" and has a non-nil SubMessage.
 func (m *Message) HasFeedbackReportMessage() bool {
 	contentType, _, err := m.Header.ContentType()
 	if err != nil {

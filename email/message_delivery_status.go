@@ -12,7 +12,9 @@ import (
 	"net/textproto"
 )
 
-// HasDeliveryStatusMessage ...
+// HasDeliveryStatusMessage returns true if this Message has a
+// content type of "message/delivery-status" and has a non-nil SubMessage
+// containing the delivery status information.
 func (m *Message) HasDeliveryStatusMessage() bool {
 	contentType, _, err := m.Header.ContentType()
 	if err != nil {
@@ -21,7 +23,8 @@ func (m *Message) HasDeliveryStatusMessage() bool {
 	return contentType == "message/delivery-status" && m.SubMessage != nil
 }
 
-// DeliveryStatusMessageDNS ...
+// DeliveryStatusMessageDNS returns the message DNS information,
+// or an error if HasDeliveryStatusMessage would return false.
 func (m *Message) DeliveryStatusMessageDNS() (Header, error) {
 	if !m.HasDeliveryStatusMessage() {
 		return Header{}, errors.New("Message does not have media content of type message/delivery-status")
@@ -29,7 +32,8 @@ func (m *Message) DeliveryStatusMessageDNS() (Header, error) {
 	return m.SubMessage.Header, nil
 }
 
-// DeliveryStatusRecipientDNS ...
+// DeliveryStatusRecipientDNS returns the message recipients' DNS information,
+// or an error if HasDeliveryStatusMessage would return false.
 func (m *Message) DeliveryStatusRecipientDNS() ([]Header, error) {
 	recipientDNS := make([]Header, 0, 1)
 	if !m.HasDeliveryStatusMessage() {

@@ -18,17 +18,19 @@ import (
 	"strings"
 )
 
-// NewMessage ...
+// NewMessage parses and returns a Message from an io.Reader
+// containing the raw text of an email message.
 func NewMessage(r io.Reader) (*Message, error) {
 	msg, err := mail.ReadMessage(&leftTrimReader{r: bufioReader(r)})
 	if err != nil {
 		return nil, err
 	}
-	return NewMessageWithHeader(Header(msg.Header), msg.Body)
+	return newMessageWithHeader(Header(msg.Header), msg.Body)
 }
 
-// NewMessageWithHeader ...
-func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
+// newMessageWithHeader parses and returns a Message from an already filled
+// Header, and an io.Reader containing the raw text of the body/payload.
+func newMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
 	bufferedReader := contentReader(headers, bodyReader)
 
@@ -53,7 +55,7 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 		boundary := mediaTypeParams["boundary"]
 		preamble, err = readPreamble(bufferedReader, boundary)
 		if err == nil {
-			parts, err = readParts(mediaType, mediaTypeParams, bufferedReader, boundary)
+			parts, err = readParts(bufferedReader, boundary)
 			if err == nil {
 				epilogue, err = readEpilogue(bufferedReader)
 			}
@@ -79,8 +81,8 @@ func NewMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 	}, nil
 }
 
-// readParts ...
-func readParts(messageMedia string, messageMediaParams map[string]string, bodyReader io.Reader, boundary string) ([]*Message, error) {
+// readParts parses out the parts of a multipart body, including the preamble and epilogue.
+func readParts(bodyReader io.Reader, boundary string) ([]*Message, error) {
 
 	parts := make([]*Message, 0, 1)
 	multipartReader := multipart.NewReader(bodyReader, boundary)
@@ -89,7 +91,7 @@ func readParts(messageMedia string, messageMediaParams map[string]string, bodyRe
 		if partErr != nil && partErr != io.EOF {
 			return []*Message{}, partErr
 		}
-		newEmailPart, msgErr := NewMessageWithHeader(Header(part.Header), part)
+		newEmailPart, msgErr := newMessageWithHeader(Header(part.Header), part)
 		part.Close()
 		if msgErr != nil {
 			return []*Message{}, msgErr
