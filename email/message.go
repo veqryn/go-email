@@ -87,6 +87,25 @@ func (m *Message) HasBody() bool {
 	return !strings.HasPrefix(mediaType, "multipart") && !strings.HasPrefix(mediaType, "message")
 }
 
+// PartsContentTypePrefix ...
+func (m *Message) PartsContentTypePrefix(contentTypePrefix string) []*Message {
+	return m.PartsFilter(contentTypePrefixFilterClosure(contentTypePrefix))
+}
+
+// PartsFilter ...
+func (m *Message) PartsFilter(filter func(*Message) bool) []*Message {
+
+	messages := make([]*Message, 0, 1)
+	if m.HasParts() {
+		for _, part := range m.Parts {
+			if filter(part) {
+				messages = append(messages, part)
+			}
+		}
+	}
+	return messages
+}
+
 // MessagesAll ...
 func (m *Message) MessagesAll() []*Message {
 	return m.MessagesFilter(func(tested *Message) bool {
@@ -96,13 +115,7 @@ func (m *Message) MessagesAll() []*Message {
 
 // MessagesContentTypePrefix ...
 func (m *Message) MessagesContentTypePrefix(contentTypePrefix string) []*Message {
-	return m.MessagesFilter(func(tested *Message) bool {
-		mediaType, _, err := tested.Header.ContentType()
-		if err != nil {
-			return false
-		}
-		return strings.HasPrefix(mediaType, contentTypePrefix)
-	})
+	return m.MessagesFilter(contentTypePrefixFilterClosure(contentTypePrefix))
 }
 
 // MessagesFilter ...
@@ -123,6 +136,17 @@ func (m *Message) MessagesFilter(filter func(*Message) bool) []*Message {
 		}
 	}
 	return messages
+}
+
+// contentTypePrefixFilterClosure ...
+func contentTypePrefixFilterClosure(contentTypePrefix string) func(*Message) bool {
+	return func(tested *Message) bool {
+		mediaType, _, err := tested.Header.ContentType()
+		if err != nil {
+			return false
+		}
+		return strings.HasPrefix(mediaType, contentTypePrefix)
+	}
 }
 
 // Methods required for sending a message:
