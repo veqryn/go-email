@@ -5,6 +5,7 @@
 package email
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"mime"
@@ -100,6 +101,13 @@ func (h Header) Save() error {
 	}
 	h.Set("MIME-Version", "1.0")
 	return nil
+}
+
+// Bytes ...
+func (h Header) Bytes() ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	_, err := h.WriteTo(buffer)
+	return buffer.Bytes(), err
 }
 
 // WriteTo ...

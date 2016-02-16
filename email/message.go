@@ -9,6 +9,7 @@ and may also be used to create and send email messages.
 package email
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -200,6 +201,13 @@ Note that having multiple parts with the same Content-Type is legal!
 // An error is returned if the Message-Id can not be created.
 func (m *Message) Save() error {
 	return m.Header.Save()
+}
+
+// Bytes ...
+func (m *Message) Bytes() ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	_, err := m.WriteTo(buffer)
+	return buffer.Bytes(), err
 }
 
 // WriteTo ...
