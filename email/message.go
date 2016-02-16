@@ -188,14 +188,17 @@ func (m *Message) Save() error {
 	return m.Header.Save()
 }
 
-// Bytes ...
+// Bytes returns the bytes representing this message.  It is a convenience
+// method that calls WriteTo on a buffer, returning its bytes.
 func (m *Message) Bytes() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	_, err := m.WriteTo(buffer)
 	return buffer.Bytes(), err
 }
 
-// WriteTo ...
+// WriteTo writes out this Message and its payloads, recursively.
+// Any text bodies will be quoted-printable encoded,
+// and all other bodies will be base64 encoded.
 func (m *Message) WriteTo(w io.Writer) (int64, error) {
 
 	total, err := m.Header.WriteTo(w)

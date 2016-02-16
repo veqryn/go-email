@@ -10,8 +10,8 @@ import (
 	"net/smtp"
 )
 
-// Send ...
-func (m *Message) Send(smtpAddress string, auth smtp.Auth) error {
+// Send this email using the SMTP Address:Port, and optionally any SMTP Auth.
+func (m *Message) Send(smtpAddressPort string, auth smtp.Auth) error {
 
 	to := m.Header.To()
 	cc := m.Header.Cc()
@@ -50,5 +50,5 @@ func (m *Message) Send(smtpAddress string, auth smtp.Auth) error {
 		return err
 	}
 
-	return smtp.SendMail(smtpAddress, auth, from.Address, all, b)
+	return smtp.SendMail(smtpAddressPort, auth, from.Address, all, b)
 }

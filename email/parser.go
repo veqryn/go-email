@@ -20,7 +20,9 @@ import (
 
 // ParseMessage parses and returns a Message from an io.Reader
 // containing the raw text of an email message.
-// (If the raw email is a string or []byte, use strings.NewReader() or bytes.NewReader() to create a reader.)
+// (If the raw email is a string or []byte, use strings.NewReader()
+// or bytes.NewReader() to create a reader.)
+// Any "quoted-printable" or "base64" encoded bodies will be decoded.
 func ParseMessage(r io.Reader) (*Message, error) {
 	msg, err := mail.ReadMessage(&leftTrimReader{r: bufioReader(r)})
 	if err != nil {
@@ -31,6 +33,9 @@ func ParseMessage(r io.Reader) (*Message, error) {
 
 // ParseMessageWithHeader parses and returns a Message from an already filled
 // Header, and an io.Reader containing the raw text of the body/payload.
+// (If the raw body is a string or []byte, use strings.NewReader()
+// or bytes.NewReader() to create a reader.)
+// Any "quoted-printable" or "base64" encoded bodies will be decoded.
 func ParseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
 	bufferedReader := contentReader(headers, bodyReader)

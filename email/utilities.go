@@ -18,12 +18,12 @@ import (
 
 var maxInt64 = big.NewInt(math.MaxInt64)
 
-// GenMessageID creates and returns a Message-ID, without surrounding triangle brackets.
+// GenMessageID creates and returns a Message-ID, without surrounding angle brackets.
 func GenMessageID() (string, error) {
 	return generateID("")
 }
 
-// GenContentID creates and returns a Content-ID, without surrounding triangle brackets.
+// GenContentID creates and returns a Content-ID, without surrounding angle brackets.
 func GenContentID(filename string) (string, error) {
 	return generateID(filename)
 }
@@ -48,7 +48,8 @@ func generateID(appendWith string) (string, error) {
 	return fmt.Sprintf("%d.%d.%d.%s@%s", nanoTime, pid, random, appendWith, hostname), nil
 }
 
-// RandomBoundary is copied from multipart.Writer.randomBoundary()
+// RandomBoundary returns a random hex string, approximately 61 characters long.
+// It is copied from multipart.Writer.randomBoundary()
 func RandomBoundary() string {
 	var buf [30]byte
 	_, err := io.ReadFull(rand.Reader, buf[:])

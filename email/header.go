@@ -27,6 +27,16 @@ const (
 // Based on textproto.MIMEHeader and mail.Header.
 type Header map[string][]string
 
+// NewHeader returns a Header for the most typical use case:
+// a Subject, a From address, and a slice of To addresses
+func NewHeader(subject string, from string, to []string) Header {
+	headers := Header{}
+	headers.SetSubject(subject)
+	headers.SetFrom(from)
+	headers.SetTo(to...)
+	return headers
+}
+
 // textproto.MIMEHeader Methods:
 
 // Add adds the key, value pair to the header.
@@ -86,8 +96,8 @@ func (h Header) AddressList(key string) ([]*mail.Address, error) {
 
 // Methods required for sending a message:
 
-// Save adds headers for the "Message-Id", "Date", and "MIME-Version", if missing.
-// An error is returned if the Message-Id can not be created.
+// Save adds headers for the "Message-Id", "Date", and "MIME-Version",
+// if missing.  An error is returned if the Message-Id can not be created.
 func (h Header) Save() error {
 	if len(h.Get("Message-Id")) == 0 {
 		id, err := GenMessageID()
@@ -103,14 +113,15 @@ func (h Header) Save() error {
 	return nil
 }
 
-// Bytes ...
+// Bytes returns the bytes representing this header.  It is a convenience
+// method that calls WriteTo on a buffer, returning its bytes.
 func (h Header) Bytes() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	_, err := h.WriteTo(buffer)
 	return buffer.Bytes(), err
 }
 
-// WriteTo ...
+// WriteTo writes this header out, including every field except for Bcc.
 func (h Header) WriteTo(w io.Writer) (int64, error) {
 	// TODO: Fix up the header writer, then switch to MaxHeaderLineLength
 	writer := &headerWriter{w: w, maxLineLen: MaxHeaderTotalLength}
