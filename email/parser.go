@@ -18,30 +18,31 @@ import (
 	"strings"
 )
 
-// NewMessage parses and returns a Message from an io.Reader
+// ParseMessage parses and returns a Message from an io.Reader
 // containing the raw text of an email message.
-func NewMessage(r io.Reader) (*Message, error) {
+// (If the raw email is a string or []byte, use strings.NewReader() or bytes.NewReader() to create a reader.)
+func ParseMessage(r io.Reader) (*Message, error) {
 	msg, err := mail.ReadMessage(&leftTrimReader{r: bufioReader(r)})
 	if err != nil {
 		return nil, err
 	}
-	return newMessageWithHeader(Header(msg.Header), msg.Body)
+	return ParseMessageWithHeader(Header(msg.Header), msg.Body)
 }
 
-// newMessageWithHeader parses and returns a Message from an already filled
+// ParseMessageWithHeader parses and returns a Message from an already filled
 // Header, and an io.Reader containing the raw text of the body/payload.
-func newMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
+func ParseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
 	bufferedReader := contentReader(headers, bodyReader)
 
 	var err error
 	var mediaType string
+	var mediaTypeParams map[string]string
+	var preamble []byte
+	var epilogue []byte
+	var body []byte
+	var parts []*Message
 	var subMessage *Message
-	mediaTypeParams := make(map[string]string)
-	preamble := make([]byte, 0, 0)
-	epilogue := make([]byte, 0, 0)
-	body := make([]byte, 0, 0)
-	parts := make([]*Message, 0, 0)
 
 	if contentType := headers.Get("Content-Type"); len(contentType) > 0 {
 		mediaType, mediaTypeParams, err = mime.ParseMediaType(contentType)
@@ -62,7 +63,7 @@ func newMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error
 		}
 
 	} else if strings.HasPrefix(mediaType, "message") {
-		subMessage, err = NewMessage(bufferedReader)
+		subMessage, err = ParseMessage(bufferedReader)
 
 	} else {
 		body, err = ioutil.ReadAll(bufferedReader)
@@ -91,7 +92,7 @@ func readParts(bodyReader io.Reader, boundary string) ([]*Message, error) {
 		if partErr != nil && partErr != io.EOF {
 			return []*Message{}, partErr
 		}
-		newEmailPart, msgErr := newMessageWithHeader(Header(part.Header), part)
+		newEmailPart, msgErr := ParseMessageWithHeader(Header(part.Header), part)
 		part.Close()
 		if msgErr != nil {
 			return []*Message{}, msgErr
@@ -107,12 +108,19 @@ func readEpilogue(r io.Reader) ([]byte, error) {
 	for len(epilogue) > 0 && isASCIISpace(epilogue[len(epilogue)-1]) {
 		epilogue = epilogue[:len(epilogue)-1]
 	}
-	return epilogue, err
+	if len(epilogue) > 0 {
+		return epilogue, err
+	}
+	return nil, err
 }
 
 // readPreamble ...
 func readPreamble(r *bufio.Reader, boundary string) ([]byte, error) {
-	return ioutil.ReadAll(&preambleReader{r: r, boundary: []byte("--" + boundary)})
+	preamble, err := ioutil.ReadAll(&preambleReader{r: r, boundary: []byte("--" + boundary)})
+	if len(preamble) > 0 {
+		return preamble, err
+	}
+	return nil, err
 }
 
 // preambleReader ...

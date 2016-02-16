@@ -181,21 +181,6 @@ func contentTypePrefixFilterClosure(contentTypePrefix string) func(*Message) boo
 }
 
 // Methods required for sending a message:
-/*
-Proper construction of a nested multipart message is as follows:
-* multipart/mixed
-* * multipart/alternative
-* * * text/plain
-* * * multipart/related
-* * * * text/html
-* * * * image/jpeg (inline with Content-ID)
-* * * * image/jpeg (inline with Content-ID)
-* * application/pdf (attachment)
-* * application/pdf (attachment)
-* * (etc with other attachments...)
-With the last listed in any multipart section being the 'preferred' one to show in any client.
-Note that having multiple parts with the same Content-Type is legal!
-*/
 
 // Save adds headers for the "Message-Id", "Date", and "MIME-Version", if missing.
 // An error is returned if the Message-Id can not be created.

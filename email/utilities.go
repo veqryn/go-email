@@ -18,8 +18,20 @@ import (
 
 var maxInt64 = big.NewInt(math.MaxInt64)
 
-// genMessageID ...
-func genMessageID() (string, error) {
+// GenMessageID creates and returns a Message-ID, without surrounding triangle brackets.
+func GenMessageID() (string, error) {
+	return generateID("")
+}
+
+// GenContentID creates and returns a Content-ID, without surrounding triangle brackets.
+func GenContentID(filename string) (string, error) {
+	return generateID(filename)
+}
+
+// generateID creates a globally unique identifier in the Message-ID format (subset of email address),
+// optionally having an additional string appended to the local part.
+// Example: 11223344556677889900.11.1234567890@localhost
+func generateID(appendWith string) (string, error) {
 	random, err := rand.Int(rand.Reader, maxInt64)
 	if err != nil {
 		return "", nil
@@ -30,9 +42,23 @@ func genMessageID() (string, error) {
 	}
 	pid := os.Getpid()
 	nanoTime := time.Now().UTC().UnixNano()
-	return fmt.Sprintf("<%d.%d.%d@%s>", nanoTime, pid, random, hostname), nil
+	if len(appendWith) == 0 {
+		return fmt.Sprintf("%d.%d.%d@%s", nanoTime, pid, random, hostname), nil
+	}
+	return fmt.Sprintf("%d.%d.%d.%s@%s", nanoTime, pid, random, appendWith, hostname), nil
 }
 
+// RandomBoundary is copied from multipart.Writer.randomBoundary()
+func RandomBoundary() string {
+	var buf [30]byte
+	_, err := io.ReadFull(rand.Reader, buf[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf[:])
+}
+
+// min ...
 func min(x, y int) int {
 	if x < y {
 		return x
@@ -40,6 +66,7 @@ func min(x, y int) int {
 	return y
 }
 
+// max ...
 func max(x, y int) int {
 	if x > y {
 		return x

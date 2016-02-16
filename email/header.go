@@ -90,11 +90,11 @@ func (h Header) AddressList(key string) ([]*mail.Address, error) {
 // An error is returned if the Message-Id can not be created.
 func (h Header) Save() error {
 	if len(h.Get("Message-Id")) == 0 {
-		id, err := genMessageID()
+		id, err := GenMessageID()
 		if err != nil {
 			return err
 		}
-		h.Set("Message-Id", id)
+		h.Set("Message-Id", "<"+id+">")
 	}
 	if len(h.Get("Date")) == 0 {
 		h.Set("Date", time.Now().Format(time.RFC822))
@@ -117,6 +117,9 @@ func (h Header) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 	// TODO: sort fields (and sort received headers by date)
 	for field, values := range h {
+		if field == "Bcc" {
+			continue // skip writting out Bcc
+		}
 		for _, val := range values {
 			val = textproto.TrimString(val)
 			writer.curLineLen = 0 // Reset for next header
@@ -166,7 +169,7 @@ func (h Header) To() []string {
 }
 
 // SetTo ...
-func (h Header) SetTo(emails []string) {
+func (h Header) SetTo(emails ...string) {
 	h.Set("To", strings.Join(emails, ", "))
 }
 
@@ -176,7 +179,7 @@ func (h Header) Cc() []string {
 }
 
 // SetCc ...
-func (h Header) SetCc(emails []string) {
+func (h Header) SetCc(emails ...string) {
 	h.Set("Cc", strings.Join(emails, ", "))
 }
 
@@ -186,7 +189,7 @@ func (h Header) Bcc() []string {
 }
 
 // SetBcc ...
-func (h Header) SetBcc(emails []string) {
+func (h Header) SetBcc(emails ...string) {
 	h.Set("Bcc", strings.Join(emails, ", "))
 }
 
