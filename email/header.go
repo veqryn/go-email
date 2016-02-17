@@ -28,12 +28,14 @@ const (
 type Header map[string][]string
 
 // NewHeader returns a Header for the most typical use case:
-// a Subject, a From address, and a slice of To addresses
-func NewHeader(subject string, from string, to []string) Header {
+// a From address, a Subject, and a variable number of To addresses.
+func NewHeader(from string, subject string, to ...string) Header {
 	headers := Header{}
 	headers.SetSubject(subject)
 	headers.SetFrom(from)
-	headers.SetTo(to...)
+	if len(to) > 0 {
+		headers.SetTo(to...)
+	}
 	return headers
 }
 
@@ -123,15 +125,14 @@ func (h Header) Bytes() ([]byte, error) {
 
 // WriteTo writes this header out, including every field except for Bcc.
 func (h Header) WriteTo(w io.Writer) (int64, error) {
-	// TODO: Fix up the header writer, then switch to MaxHeaderLineLength
+	// TODO: Change how headerWriter decides where to wrap, then switch to MaxHeaderLineLength
 	writer := &headerWriter{w: w, maxLineLen: MaxHeaderTotalLength}
 	var total int64
-	// TODO: sort fields (and sort received headers by date)
-	for field, values := range h {
+	for _, field := range sortedHeaderFields(h) {
 		if field == "Bcc" {
-			continue // skip writting out Bcc
+			continue // skip writing out Bcc
 		}
-		for _, val := range values {
+		for _, val := range h[field] {
 			val = textproto.TrimString(val)
 			writer.curLineLen = 0 // Reset for next header
 			for _, s := range []string{field, ": ", mime.QEncoding.Encode("UTF-8", val), "\r\n"} {
@@ -148,21 +149,32 @@ func (h Header) WriteTo(w io.Writer) (int64, error) {
 
 // Convenience Methods:
 
-// ContentType parses and returns the media type, any parameters on it,
+// ContentType parses and returns the content media type, any parameters on it,
 // and an error if there is no content type header field.
 func (h Header) ContentType() (string, map[string]string, error) {
-	if contentType := h.Get("Content-Type"); len(contentType) > 0 {
-		mediaType, mediaTypeParams, err := mime.ParseMediaType(contentType)
+	return h.parseMediaType("Content-Type")
+}
+
+// ContentDisposition parses and returns the media disposition, any parameters on it,
+// and an error if there is no content disposition header field.
+func (h Header) ContentDisposition() (string, map[string]string, error) {
+	return h.parseMediaType("Content-Disposition")
+}
+
+// parseMediaType ...
+func (h Header) parseMediaType(typeField string) (string, map[string]string, error) {
+	if content := h.Get(typeField); len(content) > 0 {
+		mediaType, mediaTypeParams, err := mime.ParseMediaType(content)
 		if err != nil {
 			return "", map[string]string{}, err
 		}
 		return mediaType, mediaTypeParams, nil
 	}
-	return "", map[string]string{}, ErrHeadersMissingContentType
+	return "", map[string]string{}, ErrHeadersMissingField
 }
 
-// ErrHeadersMissingContentType ...
-var ErrHeadersMissingContentType = errors.New("Message missing header field: Content-Type")
+// ErrHeadersMissingField ...
+var ErrHeadersMissingField = errors.New("Message missing header field")
 
 // From ...
 func (h Header) From() string {

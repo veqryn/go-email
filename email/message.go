@@ -94,7 +94,7 @@ func (m *Message) HasSubMessage() bool {
 // HasBody returns true if the Content-Type is not "multipart" nor "message"
 func (m *Message) HasBody() bool {
 	mediaType, _, err := m.Header.ContentType()
-	if err != nil && err != ErrHeadersMissingContentType {
+	if err != nil && err != ErrHeadersMissingField {
 		return false
 	}
 	return !strings.HasPrefix(mediaType, "multipart") && !strings.HasPrefix(mediaType, "message")
@@ -207,7 +207,7 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 	}
 
 	mediaType, mediaTypeParams, err := m.Header.ContentType()
-	if err != nil && err != ErrHeadersMissingContentType {
+	if err != nil && err != ErrHeadersMissingField {
 		return total, err
 	}
 	hasParts := strings.HasPrefix(mediaType, "multipart")

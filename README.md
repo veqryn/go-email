@@ -36,7 +36,7 @@ Walk the full message tree:
         mediaType, params, err := part.Header.ContentType()
         switch mediaType {
         case "text/plain":
-            fmt.Println(part.Body)
+            fmt.Println(string(part.Body))
         case "application/pdf":
             ...
         }
@@ -51,11 +51,11 @@ Get the decoded body of a message or part:
 Create a new simple email:
 
     // text = string with text/plain content, html = string with text/html content
-    header := email.NewHeader("This is my subject", "from.address@host.com", []string{"to.address@host.com"})
+    header := email.NewHeader("from.address@host.com", "This is my subject", "to.address@host.com", "another.to.address@host.com")
     msg := email.NewMessage(header, text, html)
 
 
-Create a new complex email:
+Create a new more complex email:
 
     // text = string with text/plain content, html = string with text/html content
     // gopherReader = io.Reader with the content of an image (as an example)

@@ -28,15 +28,15 @@ func ParseMessage(r io.Reader) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseMessageWithHeader(Header(msg.Header), msg.Body)
+	return parseMessageWithHeader(Header(msg.Header), msg.Body)
 }
 
-// ParseMessageWithHeader parses and returns a Message from an already filled
+// parseMessageWithHeader parses and returns a Message from an already filled
 // Header, and an io.Reader containing the raw text of the body/payload.
 // (If the raw body is a string or []byte, use strings.NewReader()
 // or bytes.NewReader() to create a reader.)
 // Any "quoted-printable" or "base64" encoded bodies will be decoded.
-func ParseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
+func parseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, error) {
 
 	bufferedReader := contentReader(headers, bodyReader)
 
@@ -97,7 +97,7 @@ func readParts(bodyReader io.Reader, boundary string) ([]*Message, error) {
 		if partErr != nil && partErr != io.EOF {
 			return []*Message{}, partErr
 		}
-		newEmailPart, msgErr := ParseMessageWithHeader(Header(part.Header), part)
+		newEmailPart, msgErr := parseMessageWithHeader(Header(part.Header), part)
 		part.Close()
 		if msgErr != nil {
 			return []*Message{}, msgErr

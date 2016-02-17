@@ -11,6 +11,7 @@ import (
 )
 
 // Send this email using the SMTP Address:Port, and optionally any SMTP Auth.
+// Send will call Save() on the message before sending.
 func (m *Message) Send(smtpAddressPort string, auth smtp.Auth) error {
 
 	to := m.Header.To()

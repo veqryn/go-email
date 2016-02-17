@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -48,9 +49,9 @@ func generateID(appendWith string) (string, error) {
 	return fmt.Sprintf("%d.%d.%d.%s@%s", nanoTime, pid, random, appendWith, hostname), nil
 }
 
-// RandomBoundary returns a random hex string, approximately 61 characters long.
+// randomBoundary returns a random hex string, approximately 61 characters long.
 // It is copied from multipart.Writer.randomBoundary()
-func RandomBoundary() string {
+func randomBoundary() string {
 	var buf [30]byte
 	_, err := io.ReadFull(rand.Reader, buf[:])
 	if err != nil {
@@ -59,20 +60,24 @@ func RandomBoundary() string {
 	return fmt.Sprintf("%x", buf[:])
 }
 
-// min ...
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 // max ...
 func max(x, y int) int {
 	if x > y {
 		return x
 	}
 	return y
+}
+
+// sortedHeaderFields ...
+func sortedHeaderFields(stringMap map[string][]string) []string {
+	keyCount := 0
+	sortedKeys := make([]string, len(stringMap))
+	for k := range stringMap {
+		sortedKeys[keyCount] = k
+		keyCount++
+	}
+	sort.Strings(sortedKeys)
+	return sortedKeys
 }
 
 // bufioReader ...

@@ -22,7 +22,7 @@ import (
 //     * * application/pdf (attachment)
 func NewMessage(headers Header, textPlain string, html string, attachments ...*Message) *Message {
 
-	headers.Set("Content-Type", "multipart/mixed; boundary=\""+RandomBoundary()+"\"")
+	headers.Set("Content-Type", "multipart/mixed; boundary=\""+randomBoundary()+"\"")
 
 	alternativePart := NewPartMultipart("alternative", NewPartText(textPlain), NewPartHTML(html))
 
@@ -48,7 +48,7 @@ func NewMessage(headers Header, textPlain string, html string, attachments ...*M
 //     * * application/pdf (attachment)
 func NewMessageWithInlines(headers Header, textPlain string, html string, inlines []*Message, attachments ...*Message) *Message {
 
-	headers.Set("Content-Type", "multipart/mixed; boundary=\""+RandomBoundary()+"\"")
+	headers.Set("Content-Type", "multipart/mixed; boundary=\""+randomBoundary()+"\"")
 
 	inlineParts := []*Message{NewPartHTML(html)}
 	inlineParts = append(inlineParts, inlines...)
@@ -67,7 +67,7 @@ func NewMessageWithInlines(headers Header, textPlain string, html string, inline
 // Example: if "mixed" is passed in as multipartSubType, then a "multipart/mixed" part is created.
 func NewPartMultipart(multipartSubType string, parts ...*Message) *Message {
 	return &Message{
-		Header: Header{"Content-Type": []string{"multipart/" + multipartSubType + "; boundary=\"" + RandomBoundary() + "\""}},
+		Header: Header{"Content-Type": []string{"multipart/" + multipartSubType + "; boundary=\"" + randomBoundary() + "\""}},
 		Parts:  parts}
 }
 
@@ -102,7 +102,7 @@ func NewPartAttachment(r io.Reader, filename string) (*Message, error) {
 // using the filename's mime type, and with the bytes as its content
 // (do not encode, this will happen automatically when needed).
 func NewPartAttachmentFromBytes(raw []byte, filename string) *Message {
-	return NewPartFromBytes(raw, mime.TypeByExtension(filepath.Ext(filename)), "attachment; filename=\""+filename+"\"", "")
+	return newPartFromBytes(raw, mime.TypeByExtension(filepath.Ext(filename)), "attachment; filename=\""+filename+"\"", "")
 }
 
 // NewPartInline creates an inline part,
@@ -122,26 +122,14 @@ func NewPartInline(r io.Reader, filename string, contentID string) (*Message, er
 // (do not wrap with angle brackets), and with the bytes as its content
 // (do not encode, this will happen automatically when needed).
 func NewPartInlineFromBytes(raw []byte, filename string, contentID string) *Message {
-	return NewPartFromBytes(raw, mime.TypeByExtension(filepath.Ext(filename)), "inline; filename=\""+filename+"\"", contentID)
+	return newPartFromBytes(raw, mime.TypeByExtension(filepath.Ext(filename)), "inline; filename=\""+filename+"\"", contentID)
 }
 
-// NewPart creates a generic binary part,
-// using specified contentType, Content-Disposition, Content-ID
-// (do not wrap with angle brackets), and with the reader's content
-// (do not encode, this will happen automatically when needed).
-func NewPart(r io.Reader, contentType string, contentDisposition string, contentID string) (*Message, error) {
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	return NewPartFromBytes(b, contentType, contentDisposition, contentID), nil
-}
-
-// NewPartFromBytes creates a generic binary part,
+// newPartFromBytes creates a generic binary part,
 // using specified contentType, Content-Disposition, Content-ID
 // (do not wrap with angle brackets), and with the bytes as its content
 // (do not encode, this will happen automatically when needed).
-func NewPartFromBytes(raw []byte, contentType string, contentDisposition string, contentID string) *Message {
+func newPartFromBytes(raw []byte, contentType string, contentDisposition string, contentID string) *Message {
 	headers := Header{}
 
 	if len(contentType) > 0 {
