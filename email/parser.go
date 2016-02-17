@@ -28,6 +28,12 @@ func ParseMessage(r io.Reader) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	// decode any Q-encoded values
+	for _, values := range msg.Header {
+		for idx, val := range values {
+			values[idx] = decodeRFC2047(val)
+		}
+	}
 	return parseMessageWithHeader(Header(msg.Header), msg.Body)
 }
 
@@ -182,4 +188,14 @@ func contentReader(headers Header, bodyReader io.Reader) *bufio.Reader {
 		return bufioReader(base64.NewDecoder(base64.StdEncoding, bodyReader))
 	}
 	return bufioReader(bodyReader)
+}
+
+// decodeRFC2047 ...
+func decodeRFC2047(s string) string {
+	// GO 1.5 does not decode headers, but this may change in future releases...
+	decoded, err := (&mime.WordDecoder{}).DecodeHeader(s)
+	if err != nil || len(decoded) == 0 {
+		return s
+	}
+	return decoded
 }
