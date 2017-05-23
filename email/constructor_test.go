@@ -545,3 +545,12 @@ func bytesOrPanic(b []byte, err error) []byte {
 	}
 	return b
 }
+
+func Test_RemoveMimeDuplicate(t *testing.T) {
+	contentType := "image/png; x-unix-mode=0644; name=image001.png; name=image001.png"
+
+	contentType = removeDuplicate(contentType)
+	if contentType != "image/png; x-unix-mode=0644; name=image001.png;" {
+		t.Fatal("Remove duplicate return an invalid value", contentType)
+	}
+}
