@@ -188,7 +188,11 @@ func (h Header) SetFrom(email string) {
 
 // To ...
 func (h Header) To() []string {
-	return strings.Split(h.Get("To"), ", ")
+	to := h.Get("To")
+	if to == "" {
+		return []string{}
+	}
+	return strings.Split(to, ", ")
 }
 
 // SetTo ...
@@ -198,7 +202,11 @@ func (h Header) SetTo(emails ...string) {
 
 // Cc ...
 func (h Header) Cc() []string {
-	return strings.Split(h.Get("Cc"), ", ")
+	cc := h.Get("Cc")
+	if cc == "" {
+		return []string{}
+	}
+	return strings.Split(cc, ", ")
 }
 
 // SetCc ...
@@ -208,7 +216,11 @@ func (h Header) SetCc(emails ...string) {
 
 // Bcc ...
 func (h Header) Bcc() []string {
-	return strings.Split(h.Get("Bcc"), ", ")
+	bcc := h.Get("Bcc")
+	if bcc == "" {
+		return []string{}
+	}
+	return strings.Split(bcc, ", ")
 }
 
 // SetBcc ...
