@@ -56,7 +56,8 @@ func parseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, err
 	var subMessage *Message
 
 	if contentType := headers.Get("Content-Type"); len(contentType) > 0 {
-		mediaType, mediaTypeParams, err = mime.ParseMediaType(contentType)
+		cleanContentType := strings.Replace(contentType, " ", "", -1)
+		mediaType, mediaTypeParams, err = mime.ParseMediaType(cleanContentType)
 		if err != nil {
 			return nil, err
 		}
