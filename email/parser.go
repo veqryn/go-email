@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
@@ -26,6 +27,7 @@ import (
 func ParseMessage(r io.Reader) (*Message, error) {
 	msg, err := mail.ReadMessage(&leftTrimReader{r: bufioReader(r)})
 	if err != nil {
+		log.Println("ReadMessage")
 		return nil, err
 	}
 	// decode any Q-encoded values
@@ -58,7 +60,16 @@ func parseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, err
 	if contentType := headers.Get("Content-Type"); len(contentType) > 0 {
 		mediaType, mediaTypeParams, err = mime.ParseMediaType(contentType)
 		if err != nil {
-			return nil, err
+			// handle duplicate property bogus content type
+			// and try to remove the duplicate to prevent parser error
+			if strings.Index(err.Error(), "duplicate") > -1 {
+				contentType = removeDuplicate(contentType)
+				mediaType, mediaTypeParams, err = mime.ParseMediaType(contentType)
+			}
+
+			if err != nil {
+				return nil, err
+			}
 		}
 	} // Lack of contentType is not a problem
 
@@ -91,6 +102,23 @@ func parseMessageWithHeader(headers Header, bodyReader io.Reader) (*Message, err
 		SubMessage: subMessage,
 		Parts:      parts,
 	}, nil
+}
+
+// removeDuplicate removes duplicate from bogus content type preventing parsing of email
+func removeDuplicate(s string) string {
+	m := make(map[string]bool)
+	parts := strings.Split(s, ";")
+	for _, p := range parts {
+		if _, ok := m[p]; !ok {
+			m[p] = true
+		}
+	}
+
+	var cleaned string
+	for k := range m {
+		cleaned += k + ";"
+	}
+	return cleaned
 }
 
 // readParts parses out the parts of a multipart body, including the preamble and epilogue.
