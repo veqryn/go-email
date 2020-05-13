@@ -184,7 +184,7 @@ func contentReader(headers Header, bodyReader io.Reader) *bufio.Reader {
 		headers.Del("Content-Transfer-Encoding")
 		return bufioReader(quotedprintable.NewReader(bodyReader))
 	}
-	if headers.Get("Content-Transfer-Encoding") == "base64" {
+	if strings.ToLower(headers.Get("Content-Transfer-Encoding")) == "base64" {
 		headers.Del("Content-Transfer-Encoding")
 		return bufioReader(base64.NewDecoder(base64.StdEncoding, bodyReader))
 	}
