@@ -179,11 +179,11 @@ func (r *preambleReader) Read(p []byte) (int, error) {
 
 // contentReader ...
 func contentReader(headers Header, bodyReader io.Reader) *bufio.Reader {
-	if headers.Get("Content-Transfer-Encoding") == "quoted-printable" {
+	if strings.ToLower(headers.Get("Content-Transfer-Encoding")) == "quoted-printable" {
 		headers.Del("Content-Transfer-Encoding")
 		return bufioReader(quotedprintable.NewReader(bodyReader))
 	}
-	if headers.Get("Content-Transfer-Encoding") == "base64" {
+	if strings.ToLower(headers.Get("Content-Transfer-Encoding")) == "base64" {
 		headers.Del("Content-Transfer-Encoding")
 		return bufioReader(base64.NewDecoder(base64.StdEncoding, bodyReader))
 	}
